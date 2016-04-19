@@ -301,6 +301,21 @@ public:
     }
     return R;
   }
+
+  // multiply with a C++ std::vector
+  std::vector<T> operator* (const std::vector<T>& v) const {
+    int vsz = v.size();
+    std::vector<T> r(vsz);
+    assert(vsz == _dim1);
+    for (int i = 0; i < _dim0; i++) {
+      T s = T(0);
+      for (int j = 0; j < _dim1; j++) {
+        s += _p[i*dim0+j]*v[j];
+      }
+      r[i] = s;
+    }
+    return r;
+  }
 };
 
 // typedefs
