@@ -306,11 +306,12 @@ public:
   std::vector<T> operator* (const std::vector<T>& v) const {
     int vsz = v.size();
     std::vector<T> r(vsz);
+    printf("vsz: %d   _dim1: %d\n", vsz, _dim0);
     assert(vsz == _dim1);
     for (int i = 0; i < _dim0; i++) {
       T s = T(0);
       for (int j = 0; j < _dim1; j++) {
-        s += _p[i*dim0+j]*v[j];
+        s += _p[i*_dim0+j]*v[j];
       }
       r[i] = s;
     }
