@@ -3,7 +3,7 @@
 #include "twoscale.h"
 #include "gauss_legendre.h"
 
-using Vector = vector<double>;
+using Vector = real_vector;
 
 double normf(Vector v) {
   auto s = 0.0;
@@ -16,6 +16,7 @@ private:
   int k = 8;
   double thresh = 1e-6;
   int maxlevel = 30;
+  int initiallevel = 2;
   std::map<Key,Vector> tree;
   Vector quad_x;
   Vector quad_w;
@@ -28,9 +29,17 @@ private:
 
 public:
   Function1D(int k, double thresh, int maxlevel = 30) 
-   : k(k), thresh(thresh) {
+   : k(k), thresh(thresh), maxlevel(maxlevel) {
     init_twoscale(k);
     init_quadrature(k);
+  }
+
+  Function1D(double (*f) (double), int k, double thresh, int maxlevel = 30, int initiallevel = 2) 
+   : k(k), thresh(thresh), maxlevel(maxlevel), initiallevel(initiallevel) {
+    init_twoscale(k);
+    init_quadrature(k);
+    int ntrans = std::pow(2, initiallevel);
+    for (auto l = 0; l < ntrans; l++) refine(f, initiallevel, l);
   }
 
   ~Function1D() {}
@@ -44,6 +53,7 @@ public:
     quad_x = gauss_legendre_x(order);
     quad_w = gauss_legendre_w(order);
     quad_npts = quad_w.size();
+
     quad_phi  = zeros<double>(quad_npts, k);
     quad_phiT = zeros<double>(k, quad_npts);
     quad_phiw = zeros<double>(quad_npts, k);
@@ -52,7 +62,7 @@ public:
       for (auto m = 0; m < k; m++) {
         quad_phi(i,m) = p[m];
         quad_phiT(m,i) = p[m];
-        quad_phiw[i,m] = quad_w[i]*p[m];
+        quad_phiw(i,m) = quad_w[i]*p[m];
       }
     }
   }
@@ -72,19 +82,35 @@ public:
   }
 
   void refine(double (*f)(double), int n, int l) {
-    printf("refine n: %d     l: %d\n", n, l);
+    printf("\nrefine---> n: %d     l: %d\n", n, l);
     Vector s0 = project_box(f, n+1, 2*l);
+    printf("  computed s0\n");
     Vector s1 = project_box(f, n+1, 2*l+1);
+    printf("  computed s1\n");
     Vector s(2*k);
     for (auto i = 0; i < k; i++) s[i] = s0[i];
+    printf("  copied s0 to s\n");
     for (auto i = k; i < 2*k; i++) s[i+k] = s1[i];
+    printf("  copied s1 to s\n");
     Vector d = hg*s;
-    if (normf(Vector(d.begin()+k,d.begin()+2*k)) < thresh || n >= maxlevel-1) {
+    printf("  d = hg*s\n");
+    if (normf(Vector(d.slice(k,2*k-1))) < thresh || n >= maxlevel-1) {
       tree[Key(n+1,2*l)] = s0;
+      printf("set n+1 2*l coeff\n");
       tree[Key(n+1,2*l+1)] = s1;
+      printf("set n+1 2*l+1 coeff\n");
     } else {
       refine(f, n+1, 2*l);
       refine(f, n+1, 2*l+1);
     }
+  }
+
+  void print_coeffs(int n, int l) {
+    auto s = tree[Key(n,l)];
+    printf("[%d, %d] (", n, l);
+    for (auto v : s) {
+      printf("%8.4f  ", v);
+    }
+    printf(")\n");
   }
 };

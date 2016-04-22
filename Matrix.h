@@ -35,6 +35,210 @@ void print(const Slice& sl) {
 }
 
 template <typename T>
+class VectorT {
+  // the dimensions
+  unsigned int _dim0;
+  // the data pointer
+  std::shared_ptr<T> _sp;
+  T* _p;
+  // is the matrix currently allocated?
+  bool _allocated;
+
+  friend VectorT copy(const VectorT& t, bool empty = false) {
+    VectorT r;
+    if (t._allocated) {
+      r._dim0 = t._dim0;
+      int sz = r.size();
+      r._p = new T[sz];
+      r._sp = std::shared_ptr<T>(r._p, [](T *p) {delete[] p;});
+      if (empty) {
+        for (int i = 0; i < sz; i++) {
+          r._p[i] = 0.0;
+        }
+      }
+      else {
+        for (int i = 0; i < sz; i++) {
+          r._p[i] = t._p[i];
+        }
+      }
+      r._allocated = t._allocated;
+    }
+    return r;
+  }
+
+public:
+  VectorT() 
+    :  _dim0(0), _p(0),_allocated(false) {}
+  
+  virtual ~VectorT() {
+    _allocated = false;
+    _dim0 = 0;
+  }
+  
+  VectorT& operator=(const VectorT& t) {
+    if (this != &t) {
+      _dim0 = t._dim0;
+      _p = t._p;
+      _sp = t._sp;
+      _allocated = t._allocated;
+    }
+    return *this;
+  }
+
+  VectorT(const VectorT& t) {
+    (*this) = t;
+  }
+
+  VectorT(const std::vector<T>& v) {
+    create(v.size());  
+    for (auto i = 0; i < v.size(); i++) _p[i] = v[i];
+  }
+
+  VectorT(int k) {
+    create(k);  
+    empty();
+  }
+
+  void create(int d0) {
+    // dims
+    _dim0 = d0;
+    // allocation
+    _p = new T[d0];
+    _sp = std::shared_ptr<T>(_p, [](T *p) {delete[] p;});
+    _allocated = true;
+  }
+
+  int size() const {
+    return _dim0;
+  }
+
+  // set all elements to zero
+  void empty() {
+    int sz = this->size();
+    for (int i = 0; i < sz; i++) {
+      _p[i] = T(0);
+    }
+  }
+
+  // set all elements to value
+  void value(T val) {
+    int sz = this->size();
+    for (int i = 0; i < sz; i++) {
+      _p[i] = val;
+    }
+  }
+
+  // pointer at a base position
+  T* ptr() {
+    return _p;
+  }
+
+  // pointer at a base position
+  const T* ptr() const {
+    return _p;
+  }
+
+  // pointer at a given index
+  T* ptr(int i0) {
+    return &_p[i0];
+  }
+
+  // pointer at a given index
+  const T* ptr(int i0) const {
+    return &_p[i0];
+  }
+
+  // index operator
+  T& operator[](int i) {
+    return _p[i];
+  }
+
+  // index operator
+  T& operator[](int i) const {
+    return _p[i];
+  }
+
+  // perform inplace a*(*this) + b*t
+  void gaxpy(const T& a, const VectorT& t, const T& b) {
+    int sz1 = this->size();
+    int sz2 = t.size();
+    assert(sz1 == sz2);
+    for (int i = 0; i < sz1; i++) _p[i] = a*_p[i]+b*t._p[i];
+  }
+
+  // perform out-of-place a*(*this) + b*t
+  VectorT gaxpy_oop(const T& a, const VectorT& t, const T& b) const {
+    int sz1 = this->size();
+    int sz2 = t.size();
+    assert(sz1 == sz2);
+    VectorT r = copy(*this, true);
+    for (int i = 0; i < sz1; i++) r._p[i] = a*_p[i]+b*t._p[i];
+    return r;
+  }
+
+  // addition
+  VectorT operator+(const VectorT& t) const {
+    return gaxpy_oop(1.0, t, 1.0);
+  }
+
+  // subtraction
+  VectorT operator-(const VectorT& t) const {
+    return gaxpy_oop(1.0, t, -1.0);
+  }
+
+  // inplace scaling by a constant 
+  void scale(T a) {
+    int sz = this->size();
+    for (int i = 0; i < sz; i++) _p[i] *= a;
+  }
+
+  // inner like a vector 
+  T inner(const VectorT& t) const {
+    int sz1 = this->size();
+    int sz2 = t.size();
+    assert(sz1 == sz2);
+    T rval = 0.0;
+    for (int i = 0; i < sz1; i++) rval += _p[i]*t._p[i]; 
+    return rval;
+  }
+
+  // two norm of the vector
+  T norm2() const {
+    int sz = this->size();
+    T rval = 0.0;
+    for (int i = 0; i < sz; i++) rval += _p[i]*_p[i]; 
+    return std::sqrt(rval);
+  }
+
+  // normalize the values according to the two-norm of the vector
+  void normalize() {
+    T s = this->norm2();
+    this->scale(1./s); 
+  }
+
+  VectorT<T> slice(int i0, int i1) {
+    VectorT<T> v;
+    int sz = i1-i0+1;
+    assert(sz > 0);
+    v.create(i1-i0+1);
+    for (int i = 0; i < sz; i++) 
+      v[i] = _p[i+i0];
+    return v;
+  }
+
+  T* begin() {
+    return &_p[0];
+  }
+
+  T* end() {
+    return &_p[size()-1];
+  }
+};
+
+typedef VectorT<double> real_vector;
+typedef VectorT<std::complex<double> > complex_vector;
+
+template <typename T>
 class MatrixT {
 private:
   // the dimensions
@@ -302,11 +506,25 @@ public:
     return R;
   }
 
+  // multiply with a VectorT
+  VectorT<T> operator* (const VectorT<T>& v) const {
+    int vsz = v.size();
+    VectorT<T> r(vsz);
+    assert(vsz == _dim1);
+    for (int i = 0; i < _dim0; i++) {
+      T s = T(0);
+      for (int j = 0; j < _dim1; j++) {
+        s += _p[i*_dim0+j]*v[j];
+      }
+      r[i] = s;
+    }
+    return r;
+  }
+
   // multiply with a C++ std::vector
   std::vector<T> operator* (const std::vector<T>& v) const {
     int vsz = v.size();
     std::vector<T> r(vsz);
-    printf("vsz: %d   _dim1: %d\n", vsz, _dim0);
     assert(vsz == _dim1);
     for (int i = 0; i < _dim0; i++) {
       T s = T(0);
@@ -415,7 +633,7 @@ MatrixT<Q> constant(int d0, int d1, double val) {
 // create an constant matrix
 template <typename Q>
 MatrixT<Q> ones(int d0, int d1) {
-  return constant(d0, d1, T(1.0));
+  return constant(d0, d1, Q(1.0));
 }
 
 template <typename Q>

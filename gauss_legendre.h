@@ -1,7 +1,10 @@
 #ifndef GAUSS_LEGENDRE_H_
 #define GAUSS_LEGENDRE_H_
 
-#include <vector>
+#include "Matrix.h"
+
+//using GLVector = real_vector;
+using GLVector = std::vector<double>;
 
 #define GL_POINTS0 = {}
 #define GL_WEIGHTS0 = {}
@@ -38,53 +41,53 @@
 #define GL_POINTS11 = {0.98911432907302843, 0.94353129988404771, 0.86507600278702468, 0.75954806460340585, 0.63477157797617245, 0.50000000000000000, 0.36522842202382755, 0.24045193539659410, 0.13492399721297532, 0.05646870011595234, 0.01088567092697151}
 #define GL_WEIGHTS11 = { 0.02783428355808731, 0.06279018473245226, 0.09314510546386703, 0.11659688229599521, 0.13140227225512346, 0.13646254338895031, 0.13140227225512346, 0.11659688229599521, 0.09314510546386703, 0.06279018473245226, 0.02783428355808731}
 
-std::vector<double> gauss_legendre_x(int k) {
+GLVector gauss_legendre_x(int k) {
   if (k == 0) {
-    std::vector<double> x GL_POINTS0;
+    GLVector x GL_POINTS0;
     return x;
   }
   else if (k == 1) {
-    std::vector<double> x GL_POINTS1;
+    GLVector x GL_POINTS1;
     return x;
   }
   else if (k == 2) {
-    std::vector<double> x GL_POINTS2;
+    GLVector x GL_POINTS2;
     return x;
   }
   else if (k == 3) {
-    std::vector<double> x GL_POINTS3;
+    GLVector x GL_POINTS3;
     return x;
   }
   else if (k == 4) {
-    std::vector<double> x GL_POINTS4;
+    GLVector x GL_POINTS4;
     return x;
   }
   else if (k == 5) {
-    std::vector<double> x GL_POINTS5;
+    GLVector x GL_POINTS5;
     return x;
   }
   else if (k == 6) {
-    std::vector<double> x GL_POINTS6;
+    GLVector x GL_POINTS6;
     return x;
   }
   else if (k == 7) {
-    std::vector<double> x GL_POINTS7;
+    GLVector x GL_POINTS7;
     return x;
   }
   else if (k == 8) {
-    std::vector<double> x GL_POINTS8;
+    GLVector x GL_POINTS8;
     return x;
   }
   else if (k == 9) {
-    std::vector<double> x GL_POINTS9;
+    GLVector x GL_POINTS9;
     return x;
   }
   else if (k == 10) {
-    std::vector<double> x GL_POINTS10;
+    GLVector x GL_POINTS10;
     return x;
   }
   else if (k == 11) {
-    std::vector<double> x GL_POINTS11;
+    GLVector x GL_POINTS11;
     return x;
   }
   else {
@@ -92,53 +95,53 @@ std::vector<double> gauss_legendre_x(int k) {
   }
 }
 
-std::vector<double> gauss_legendre_w(int k) {
+GLVector gauss_legendre_w(int k) {
   if (k == 0) {
-    std::vector<double> w GL_WEIGHTS0;
+    GLVector w GL_WEIGHTS0;
     return w;
   }
   else if (k == 1) {
-    std::vector<double> w GL_WEIGHTS1;
+    GLVector w GL_WEIGHTS1;
     return w;
   }
   else if (k == 2) {
-    std::vector<double> w GL_WEIGHTS2;
+    GLVector w GL_WEIGHTS2;
     return w;
   }
   else if (k == 3) {
-    std::vector<double> w GL_WEIGHTS3;
+    GLVector w GL_WEIGHTS3;
     return w;
   }
   else if (k == 4) {
-    std::vector<double> w GL_WEIGHTS4;
+    GLVector w GL_WEIGHTS4;
     return w;
   }
   else if (k == 5) {
-    std::vector<double> w GL_WEIGHTS5;
+    GLVector w GL_WEIGHTS5;
     return w;
   }
   else if (k == 6) {
-    std::vector<double> w GL_WEIGHTS6;
+    GLVector w GL_WEIGHTS6;
     return w;
   }
   else if (k == 7) {
-    std::vector<double> w GL_WEIGHTS7;
+    GLVector w GL_WEIGHTS7;
     return w;
   }
   else if (k == 8) {
-    std::vector<double> w GL_WEIGHTS8;
+    GLVector w GL_WEIGHTS8;
     return w;
   }
   else if (k == 9) {
-    std::vector<double> w GL_WEIGHTS9;
+    GLVector w GL_WEIGHTS9;
     return w;
   }
   else if (k == 10) {
-    std::vector<double> w GL_WEIGHTS10;
+    GLVector w GL_WEIGHTS10;
     return w;
   }
   else if (k == 11) {
-    std::vector<double> w GL_WEIGHTS11;
+    GLVector w GL_WEIGHTS11;
     return w;
   }
   else {

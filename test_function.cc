@@ -9,7 +9,7 @@ double func(double x) {
 }
 
 int main(int argc, char** argv) {
-  Function1D f(8, 1e-6, 10);
-  f.refine(func, 2, 1); 
+
+  Function1D f(func, 8, 1e-6, 3);
   return 0;
 }
