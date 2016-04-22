@@ -96,7 +96,7 @@ public:
 
   VectorT(int k) {
     create(k);  
-    for (auto i = 0; i < v.size(); i++) _p[i] = T(0);
+    for (auto i = 0; i < k; i++) _p[i] = T(0);
   }
 
   void create(int d0) {
@@ -509,7 +509,9 @@ public:
   // multiply with a VectorT
   VectorT<T> operator* (const VectorT<T>& v) const {
     int vsz = v.size();
-    VectorT<T> r(vsz);
+    // VectorT<T> r(vsz);
+    VectorT<T> r;
+    r.create(vsz);
     assert(vsz == _dim1);
     for (int i = 0; i < _dim0; i++) {
       T s = T(0);

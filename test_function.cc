@@ -10,6 +10,7 @@ double func(double x) {
 
 int main(int argc, char** argv) {
 
-  Function1D f(func, 8, 1e-6, 3);
+  Function1D f(func, 8, 1e-6, 300);
+  f.print_tree();
   return 0;
 }
