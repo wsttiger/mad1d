@@ -96,7 +96,7 @@ public:
 
   VectorT(int k) {
     create(k);  
-    empty();
+    for (auto i = 0; i < v.size(); i++) _p[i] = T(0);
   }
 
   void create(int d0) {
