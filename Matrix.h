@@ -226,17 +226,23 @@ public:
     return v;
   }
 
-  T* begin() {
+  T* begin() const {
     return &_p[0];
   }
 
-  T* end() {
-    return &_p[size()-1];
+  T* end() const {
+    return &_p[size()];
   }
 };
 
 typedef VectorT<double> real_vector;
 typedef VectorT<std::complex<double> > complex_vector;
+
+void print(const real_vector& v) {
+  printf("[");
+  for (auto& t : v) printf("%10.5e  ", t);
+  printf("]\n");
+}
 
 template <typename T>
 class MatrixT {
@@ -564,6 +570,11 @@ MatrixT<Q> gaxpy(const Q& a, const MatrixT<Q>& T1, const Q& b, const MatrixT<Q>&
 
 template <typename Q>
 double inner(const MatrixT<Q>& t1, const MatrixT<Q>& t2) {
+  return t1.inner(t2);
+}
+
+template <typename Q>
+double inner(const VectorT<Q>& t1, const VectorT<Q>& t2) {
   return t1.inner(t2);
 }
 

@@ -10,7 +10,9 @@ double func(double x) {
 
 int main(int argc, char** argv) {
 
-  Function1D f(func, 8, 1e-6, 300);
+  Function1D f(func, 8, 1e-10, 30, 2);
   f.print_tree();
+  auto x = 0.23111;
+  printf("x: %15.8e f: %15.8e func: %15.8e error: %15.8e\n", x, f(x), func(x), std::abs(f(x)-func(x)));
   return 0;
 }

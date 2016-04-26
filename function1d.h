@@ -7,13 +7,13 @@ using Vector = real_vector;
 
 double normf(Vector v) {
   auto s = 0.0;
-  for (auto i = 0; i < v.size(); i++) s+=v[i];
-  return s;
+  for (auto t : v) s+=t*t;
+  return std::sqrt(s);
 }
 
 class Function1D {
 private:
-  bool debug = true;
+  bool debug = false;
   int k = 8;
   double thresh = 1e-6;
   int maxlevel = 30;
@@ -95,7 +95,20 @@ public:
       s[i+k] = s1[i];
     }
     Vector d = hg*s;
-    if (debug) printf("  d = hg*s\n");
+    if (debug) {
+      printf("s0: ");
+      print(s0);
+      printf("s1: ");
+      print(s1);
+      printf("s: ");
+      print(s);
+      printf("d: ");
+      print(d);
+      printf("d.slice(k,2*k-1): ");
+      print(Vector(d.slice(k,2*k-1)));
+      printf("d slice norm: %15.8e\n", normf(Vector(d.slice(k,2*k-1))));
+    }
+    if (debug) printf("\n  d = hg*s\n");
     if (normf(Vector(d.slice(k,2*k-1))) < thresh || n >= maxlevel-1) {
       tree[Key(n+1,2*l)] = s0;
       if (debug) printf("set n+1 2*l coeff (%d  %d)\n",n+1,2*l);
@@ -107,19 +120,51 @@ public:
     }
   }
 
+  double operator()(double x) {
+    return eval(x, 0, 0);
+  }
+
+  double eval(double x, int n, int l) {
+    assert(n < maxlevel);
+    auto treep = tree.find(Key(n,l));
+    if (treep != tree.end()) {
+      auto p = ScalingFunction::instance()->phi(x, k);
+      auto t = inner(treep->second,p)*std::sqrt(std::pow(2.0,n));
+      return t;
+    } else {
+      auto n2 = n + 1;
+      auto l2 = 2*l;
+      auto x2 = 2*x; 
+      if (x2 >= 1.0) {
+        l2 = l2 + 1;
+        x2 = x2 - 1;
+      }
+      return eval(x2, n2, l2);
+    } 
+  }
+
   void print_coeffs(int n, int l) {
     auto s = tree[Key(n,l)];
     printf("[%d, %d] (", n, l);
     for (auto v : s) {
       printf("%8.4f  ", v);
     }
-    printf(")\n");
+    printf(")  %15.8e\n",normf(s));
   }
 
   void print_tree() {
     for (auto c : tree) {
-      Key k = c.first;
-      printf("[%d  %d]\n", k.n, k.l);
+      auto k = c.first;
+      auto s = c.second; 
+      printf("[%d  %d]     %15.8e\n", k.n, k.l, normf(s));
     }
   }
+
+  // void summarize() {
+  //   printf("sum coeffs:\n");
+  //   for (auto c : tree) {
+  //     auto key = c.first;
+  //     auto s = c.second;
+  //   }
+  // }
 };

@@ -9,7 +9,7 @@ struct Key {
   Key(int n, int l) : n(n), l(l) {}
 
   bool operator< (const Key &k) const {
-    return ((1<<n)+l < (k.n<<n)+k.l);
+    return ((1<<n)+l < (1<<k.n)+k.l);
   }
 };
 
