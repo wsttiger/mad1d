@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
   printf("x: %15.8e f: %15.8e func: %15.8e error: %15.8e\n", x, f(x), func(x), std::abs(f(x)-func(x)));
   auto g = compress(f);
   g.print_tree();
-  auto h = reconstruct(g);
+  auto h = 2.0*reconstruct(g);
   h.print_tree();
   return 0;
 }
