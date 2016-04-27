@@ -4,6 +4,7 @@
 #include "gauss_legendre.h"
 
 using Vector = real_vector;
+using CoeffTree = std::map<Key,Vector>;
 
 double normf(Vector v) {
   auto s = 0.0;
@@ -18,7 +19,8 @@ private:
   double thresh = 1e-6;
   int maxlevel = 30;
   int initiallevel = 4;
-  std::map<Key,Vector> tree;
+  CoeffTree stree;
+  CoeffTree dtree;
   Vector quad_x;
   Vector quad_w;
   int quad_npts;
@@ -29,8 +31,10 @@ private:
   real_matrix quad_phiw;
 
 public:
-  Function1D(int k, double thresh, int maxlevel = 30) 
-   : k(k), thresh(thresh), maxlevel(maxlevel) {
+  friend Function1D compress(const Function1D& f);
+
+  Function1D(int k, double thresh, int maxlevel = 30, int initiallevel = 4) 
+   : k(k), thresh(thresh), maxlevel(maxlevel), initiallevel(initiallevel) {
     init_twoscale(k);
     init_quadrature(k);
   }
@@ -110,14 +114,40 @@ public:
     }
     if (debug) printf("\n  d = hg*s\n");
     if (normf(Vector(d.slice(k,2*k-1))) < thresh || n >= maxlevel-1) {
-      tree[Key(n+1,2*l)] = s0;
+      stree[Key(n+1,2*l)] = s0;
       if (debug) printf("set n+1 2*l coeff (%d  %d)\n",n+1,2*l);
-      tree[Key(n+1,2*l+1)] = s1;
+      stree[Key(n+1,2*l+1)] = s1;
       if (debug) printf("set n+1 2*l+1 coeff (%d  %d)\n",n+1,2*l+1);
     } else {
       refine(f, n+1, 2*l);
       refine(f, n+1, 2*l+1);
     }
+  }
+
+  Vector compress_spawn(CoeffTree& dtree_r, int n, int l) const {
+    auto s0p = stree.find(Key(n+1,2*l));
+    auto s1p = stree.find(Key(n+1,2*l+1));
+    Vector s0, s1;
+    if (s0p == stree.end()) {
+      s0 = compress_spawn(dtree_r, n+1, 2*l);
+    } else {
+      s0 = s0p->second;
+    }
+    if (s1p == stree.end()) {
+      s1 = compress_spawn(dtree_r, n+1, 2*l+1);
+    } else {
+      s1 = s1p->second;
+    }
+    Vector s(2*k);
+    for (auto i = 0; i < k; i++) {
+      s[i]   = s0[i];
+      s[i+k] = s1[i];
+    }
+    Vector d = hg*s;
+    auto sr = d.slice(0,k); 
+    auto dr = d.slice(k,2*k);
+    dtree_r[Key(n,l)] = dr; 
+    return sr; 
   }
 
   double operator()(double x) {
@@ -126,8 +156,8 @@ public:
 
   double eval(double x, int n, int l) {
     assert(n < maxlevel);
-    auto treep = tree.find(Key(n,l));
-    if (treep != tree.end()) {
+    auto treep = stree.find(Key(n,l));
+    if (treep != stree.end()) {
       auto p = ScalingFunction::instance()->phi(x, k);
       auto t = inner(treep->second,p)*std::sqrt(std::pow(2.0,n));
       return t;
@@ -144,19 +174,34 @@ public:
   }
 
   void print_coeffs(int n, int l) {
-    auto s = tree[Key(n,l)];
+    printf("sum coeffs:\n");
+    auto s = stree[Key(n,l)];
     printf("[%d, %d] (", n, l);
     for (auto v : s) {
       printf("%8.4f  ", v);
     }
     printf(")  %15.8e\n",normf(s));
+    printf("diff coeffs:\n");
+    auto d = dtree[Key(n,l)];
+    printf("[%d, %d] (", n, l);
+    for (auto v : d) {
+      printf("%8.4f  ", v);
+    }
+    printf(")  %15.8e\n",normf(d));
   }
 
   void print_tree() {
-    for (auto c : tree) {
+    printf("sum coeffs:\n");
+    for (auto c : stree) {
       auto k = c.first;
       auto s = c.second; 
       printf("[%d  %d]     %15.8e\n", k.n, k.l, normf(s));
+    }
+    printf("diff coeffs:\n");
+    for (auto c : dtree) {
+      auto k = c.first;
+      auto d = c.second; 
+      printf("[%d  %d]     %15.8e\n", k.n, k.l, normf(d));
     }
   }
 
@@ -168,3 +213,45 @@ public:
   //   }
   // }
 };
+
+// Function1D compress(const Function1D& f) {
+//   Function1D r(f.k, f.thresh, f.maxlevel, f.initiallevel);
+//   int sz = f.stree.size();
+//   assert(sz % 2 == 0);
+//   sz = sz / 2;
+//   bool keepgoing = true;
+//   int cnt = 0;
+//   for (auto n = 0; keepgoing && n < r.maxlevel; n++) {
+//     auto maxl = 1<<n;
+//     for (auto l = 0; keepgoing && l < maxl; l++) {
+//       auto s0p = f.stree.find(Key(n+1,2*l));
+//       auto s1p = f.stree.find(Key(n+1,2*l+1));
+//       if ((s0p != f.stree.end()) && (s0p != f.stree.end())) {
+//         auto s0 = s0p->second;
+//         auto s1 = s1p->second;
+//         Vector s(2*r.k);
+//         for (auto i = 0; i < r.k; i++) {
+//           s[i] = s0[i];
+//           s[i+r.k] = s1[i];
+//         }
+//         Vector d = r.hg*s;
+//         r.stree[Key(n,l)] = d.slice(0,r.k);
+//         r.dtree[Key(n,l)] = d.slice(r.k,2*r.k);
+//         keepgoing = sz > ++cnt;
+//       }
+//     }
+//   }  
+//   return r;
+// }
+
+Function1D compress(const Function1D& f) {
+  Function1D r(f.k, f.thresh, f.maxlevel, f.initiallevel);
+  auto s0 = f.compress_spawn(r.dtree, 0, 0);
+  r.stree[Key(0,0)] = s0;
+  return r;
+}
+
+
+
+
+
