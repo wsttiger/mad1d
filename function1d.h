@@ -32,6 +32,7 @@ private:
 
 public:
   friend Function1D compress(const Function1D& f);
+  friend Function1D reconstruct(const Function1D& f);
 
   Function1D(int k, double thresh, int maxlevel = 30, int initiallevel = 4) 
    : k(k), thresh(thresh), maxlevel(maxlevel), initiallevel(initiallevel) {
@@ -124,6 +125,29 @@ public:
     }
   }
 
+  void reconstruct_spawn(CoeffTree& stree_r, const Vector& ss, int n, int l) const {
+    auto dp = dtree.find(Key(n,l));  
+    if (dp != dtree.end()) {
+      Vector dd = dp->second;
+      Vector d(2*k);
+      for (auto i = 0; i < k; i++) {
+        d[i]   = ss[i];
+        d[i+k] = dd[i];
+      }
+      auto s = hgT*d;
+      Vector s0(k);
+      Vector s1(k);
+      for (auto i = 0; i < k; i++) {
+        s0[i] = s[i];
+        s1[i] = s[i+k];
+      }
+      reconstruct_spawn(stree_r, s0, n+1, 2*l);
+      reconstruct_spawn(stree_r, s0, n+1, 2*l+1);
+    } else {
+      stree_r[Key(n,l)] = ss;
+    }
+  }
+  
   Vector compress_spawn(CoeffTree& dtree_r, int n, int l) const {
     auto s0p = stree.find(Key(n+1,2*l));
     auto s1p = stree.find(Key(n+1,2*l+1));
@@ -248,6 +272,13 @@ Function1D compress(const Function1D& f) {
   Function1D r(f.k, f.thresh, f.maxlevel, f.initiallevel);
   auto s0 = f.compress_spawn(r.dtree, 0, 0);
   r.stree[Key(0,0)] = s0;
+  return r;
+}
+
+Function1D reconstruct(const Function1D& f) {
+  Function1D r(f.k, f.thresh, f.maxlevel, f.initiallevel);
+  const auto s0 = f.stree.find(Key(0,0))->second;
+  f.reconstruct_spawn(r.stree, s0, 0, 0);
   return r;
 }
 
