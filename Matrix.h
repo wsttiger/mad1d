@@ -186,6 +186,14 @@ public:
     return gaxpy_oop(1.0, t, -1.0);
   }
 
+  void operator+=(const VectorT& t) {
+    gaxpy(1.0, t, 1.0);
+  }
+
+  void operator-=(const VectorT& t) {
+    gaxpy(1.0, t, -1.0);
+  }
+
   // inplace scaling by a constant 
   void scale(T a) {
     int sz = this->size();
@@ -240,7 +248,9 @@ typedef VectorT<std::complex<double> > complex_vector;
 
 void print(const real_vector& v) {
   printf("[");
-  for (auto& t : v) printf("%10.5e  ", t);
+  //for (auto& t : v) printf("%10.5e  ", t);
+  auto sz = v.size();
+  for (auto i = 0; i < sz; i++) printf("%10.5e  ", v[i]);
   printf("]\n");
 }
 

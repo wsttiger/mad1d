@@ -8,7 +8,8 @@ using CoeffTree = std::map<Key,Vector>;
 
 double normf(Vector v) {
   auto s = 0.0;
-  for (auto t : v) s+=t*t;
+  //for (auto t : v) s+=t*t;
+  for (auto i = 0; i < v.size(); i++) s+=v[i]*v[i];
   return std::sqrt(s);
 }
 
@@ -138,25 +139,37 @@ public:
   Vector compress_spawn(CoeffTree& dtree_r, int n, int l) const {
     auto s0p = stree.find(Key(n+1,2*l));
     auto s1p = stree.find(Key(n+1,2*l+1));
-    Vector s0, s1;
-    if (s0p == stree.end()) {
-      s0 = compress_spawn(dtree_r, n+1, 2*l);
-    } else {
-      s0 = s0p->second;
-    }
-    if (s1p == stree.end()) {
-      s1 = compress_spawn(dtree_r, n+1, 2*l+1);
-    } else {
-      s1 = s1p->second;
-    }
+    Vector s0 = (s0p == stree.end()) ? compress_spawn(dtree_r, n+1, 2*l)   : s0p->second;
+    Vector s1 = (s1p == stree.end()) ? compress_spawn(dtree_r, n+1, 2*l+1) : s1p->second;
     Vector s(2*k);
     for (auto i = 0; i < k; i++) {
       s[i]   = s0[i];
       s[i+k] = s1[i];
     }
     Vector d = hg*s;
-    auto sr = d.slice(0,k); 
-    auto dr = d.slice(k,2*k);
+    auto sr = d.slice(0,k-1); 
+    auto dr = d.slice(k,2*k-1);
+    if (normf(dr) > 1e5) {
+      printf("%d  %d     %15.8e  %15.8e  %15.8e  %15.8e\n",n, l, normf(s0), normf(s1), normf(sr), normf(dr)); 
+      printf("s0\n");
+      print(s0);
+      printf("\n");
+      printf("s1\n");
+      print(s1);
+      printf("\n");
+      printf("sr\n");
+      print(sr);
+      printf("\n");
+      printf("dr\n");
+      print(dr);
+      printf("\n");
+      printf("s\n");
+      print(s);
+      printf("\n");
+      printf("d\n");
+      print(d);
+      printf("\n");
+    }
     dtree_r[Key(n,l)] = dr; 
     return sr; 
   }
@@ -166,18 +179,42 @@ public:
   }
 
   Function1D operator+(const Function1D& f) const {
+    // Make sure that everybody is compressed
     assert(form == FunctionForm::COMPRESSED);
     assert(f.form == FunctionForm::COMPRESSED);
     Function1D r(f.k, f.thresh, f.maxlevel, f.initiallevel);
     r.form = f.form;
-    auto sz1 = dtree.size(); 
-    auto sz2 = f.dtree.size(); 
-    auto sz = sz1+sz2;
-    for (auto n = 0; n < maxlevel; n++) {
-      auto maxl = 1<<n;
-      for (auto l = 0; l < maxl; l++) {
+    auto& dtree_r = r.dtree;
+    auto& stree_r = r.stree;
+    // Loop over d-coeffs in this tree and add these coeffs
+    // to the d-coeffs in the f tree IF THEY EXIST 
+    // then insert into the result
+    for (auto c : dtree) {
+      auto key = c.first;
+      auto dcoeffs = copy(c.second);
+      auto c2 = f.dtree.find(key);
+      if (c2 != f.dtree.end()) {
+        dcoeffs += c2->second;
+        dtree_r[key] = dcoeffs;
+      } else {
+        dtree_r[key] = dcoeffs;
       }
     }
+    // Loop over the remainder d-coeffs in the f tree and insert
+    // into the result tree
+    for (auto c : f.dtree) {
+      auto key = c.first;
+      auto c2 = dtree_r.find(key);
+      if (c2 == dtree_r.end()) {
+        dtree_r[key] = copy(c.second);
+      }
+    }
+    // Do s0 coeffs
+    auto c1 = stree.find(Key(0,0));
+    auto c2 = f.stree.find(Key(0,0));
+    assert(c1 != stree.end());
+    assert(c2 != f.stree.end());
+    stree_r[Key(0,0)] = c1->second + c2->second;
     return r;
   }
 
