@@ -35,6 +35,7 @@ private:
   real_matrix quad_phiw;
 
 public:
+  // I know that friends are evil, but I decided to have them anyway
   friend Function1D operator*(const double& s, const Function1D& f);
   friend Function1D operator*(const Function1D& f, const double& s);
   friend Function1D compress(const Function1D& f);
@@ -55,6 +56,12 @@ public:
     init_quadrature(k);
     int ntrans = std::pow(2, initiallevel);
     for (auto l = 0; l < ntrans; l++) refine(f, initiallevel, l);
+    for (auto n = 0; n <= initiallevel; n++) {
+      ntrans = std::pow(2,n);
+      for (auto l = 0; l < ntrans; l++) {
+        stree[Key(n,l)] = Vector();
+      }
+    }
   }
 
   ~Function1D() {}
@@ -112,6 +119,7 @@ public:
       stree[Key(n+1,2*l)] = s0;
       stree[Key(n+1,2*l+1)] = s1;
     } else {
+      stree[Key(n,l)] = Vector();
       refine(f, n+1, 2*l);
       refine(f, n+1, 2*l+1);
     }
@@ -135,6 +143,7 @@ public:
       }
       reconstruct_spawn(stree_r, s0, n+1, 2*l);
       reconstruct_spawn(stree_r, s1, n+1, 2*l+1);
+      stree_r[Key(n,l)] = Vector();
     } else {
       stree_r[Key(n,l)] = ss;
     }
@@ -143,8 +152,18 @@ public:
   Vector compress_spawn(CoeffTree& dtree_r, int n, int l) const {
     auto s0p = stree.find(Key(n+1,2*l));
     auto s1p = stree.find(Key(n+1,2*l+1));
-    Vector s0 = (s0p == stree.end()) ? compress_spawn(dtree_r, n+1, 2*l)   : s0p->second;
-    Vector s1 = (s1p == stree.end()) ? compress_spawn(dtree_r, n+1, 2*l+1) : s1p->second;
+    Vector s0;
+    Vector s1;
+    if (s0p != stree.end()) {
+      s0 = ((s0p->second).size() == 0) ? compress_spawn(dtree_r, n+1, 2*l) : s0p->second;
+    } else {
+      s0 = compress_spawn(dtree_r, n+1, 2*l);
+    }
+    if (s1p != stree.end()) {
+      s1 = ((s1p->second).size() == 0) ? compress_spawn(dtree_r, n+1, 2*l+1) : s1p->second;
+    } else {
+      s1 = compress_spawn(dtree_r, n+1, 2*l+1);
+    }
     Vector s(2*k);
     for (auto i = 0; i < k; i++) {
       s[i]   = s0[i];
@@ -222,7 +241,7 @@ public:
   double eval(double x, int n, int l) {
     assert(n < maxlevel);
     auto treep = stree.find(Key(n,l));
-    if (treep != stree.end()) {
+    if (treep != stree.end() && (treep->second).size()) {
       auto p = ScalingFunction::instance()->phi(x, k);
       auto t = inner(treep->second,p)*std::sqrt(std::pow(2.0,n));
       return t;
@@ -276,10 +295,12 @@ Function1D operator*(const double& s, const Function1D& f) {
   r.form = f.form;
   for (auto cp : f.stree) {
     auto key = cp.first;
-    auto c = cp.second; 
-    auto c2 = copy(c);
-    c2.scale(s);
-    r.stree[key] = c2;
+    if ((cp.second).size()) {
+      auto c = cp.second; 
+      auto c2 = copy(c);
+      c2.scale(s);
+      r.stree[key] = c2;
+    }
   }
   for (auto cp : f.dtree) {
     auto key = cp.first;
