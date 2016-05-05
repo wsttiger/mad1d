@@ -39,6 +39,7 @@ public:
   friend Function1D operator*(const Function1D& f, const double& s);
   friend Function1D compress(const Function1D& f);
   friend Function1D reconstruct(const Function1D& f);
+  friend Function1D norm2(const Function1D& f); 
 
   Function1D(int k, double thresh, int maxlevel = 30, int initiallevel = 4) 
    : k(k), thresh(thresh), maxlevel(maxlevel), initiallevel(initiallevel) {
@@ -57,6 +58,9 @@ public:
   }
 
   ~Function1D() {}
+
+  bool is_compressed() {return form == FunctionForm::COMPRESSED;}
+  bool is_reconstructed() {return form == FunctionForm::RECONSTRUCTED;}
 
   void init_twoscale(int k) {
     hg = TwoScaleCoeffs::instance()->hg(k); 
@@ -149,27 +153,6 @@ public:
     Vector d = hg*s;
     auto sr = d.slice(0,k-1); 
     auto dr = d.slice(k,2*k-1);
-    if (normf(dr) > 1e5) {
-      printf("%d  %d     %15.8e  %15.8e  %15.8e  %15.8e\n",n, l, normf(s0), normf(s1), normf(sr), normf(dr)); 
-      printf("s0\n");
-      print(s0);
-      printf("\n");
-      printf("s1\n");
-      print(s1);
-      printf("\n");
-      printf("sr\n");
-      print(sr);
-      printf("\n");
-      printf("dr\n");
-      print(dr);
-      printf("\n");
-      printf("s\n");
-      print(s);
-      printf("\n");
-      printf("d\n");
-      print(d);
-      printf("\n");
-    }
     dtree_r[Key(n,l)] = dr; 
     return sr; 
   }
@@ -217,6 +200,24 @@ public:
     stree_r[Key(0,0)] = c1->second + c2->second;
     return r;
   }
+
+  // void mul_helper(const CoeffTree& f, const CoeffTree& g, const Vector& fs, const Vector& gs, int n, int l) {
+  //   auto fsin = fs;
+  //   if (fsin.size() == 0) {
+  //     const auto fp = f.find(Key(n,l));
+  //     
+  //   }
+  //   const auto gp = g.find(Key(n,l));
+  //    
+  // }
+
+  // Function1D operator*(const Function1D& f) const {
+  //   Function1D r(f.k, f.thresh, f.maxlevel, f.initiallevel);
+  //   r.form = Function1D::FunctionForm::RECONSTRUCTED;
+  //   assert(is_reconstructed());
+  //   assert(f.is_reconstructed());
+  //   r.mul_helper(stree, f.stree, Vector(), Vector(), 0, 0); 
+  // }
 
   double eval(double x, int n, int l) {
     assert(n < maxlevel);
@@ -310,4 +311,17 @@ Function1D reconstruct(const Function1D& f) {
   return r;
 }
 
+// double norm2(const Function1D& f) {
+//   if (is_reconstructed()) return norm2(compress(f));
+//   else {
+//     auto s0p = f.stree[Key(0,0)];
+//     assert(s0p != f.stree.end());
+//     auto s = normf(s0p->second);
+//     for (dp : f.dtree) {
+//       assert(dp != f.dtree.end());
+//       s += normf(dp->second);  
+//     }
+//   }
+//   return s;
+// }
 
