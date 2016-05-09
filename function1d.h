@@ -13,6 +13,28 @@ double normf(Vector v) {
   return std::sqrt(s);
 }
 
+inline 
+void pack(int k, const Vector& s0, const Vector& s1, Vector& s) {
+  assert(s0.size() == k);
+  assert(s1.size() == k);
+  assert(s.size() == 2*k);
+  for (auto i = 0; i < k; i++) {
+    s[i]   = s0[i];
+    s[i+k] = s1[i];
+  }
+}
+
+inline
+void unpack(int k, const Vector& s, Vector& s0, Vector& s1) {
+  assert(s0.size() == k);
+  assert(s1.size() == k);
+  assert(s.size() == 2*k);
+  for (auto i = 0; i < k; i++) {
+    s0[i] = s[i];
+    s1[i] = s[i+k];
+  }
+}
+
 class Function1D {
 private:
   enum class FunctionForm {RECONSTRUCTED, COMPRESSED, UNDEFINED};
@@ -33,6 +55,7 @@ private:
   real_matrix quad_phi;
   real_matrix quad_phiT;
   real_matrix quad_phiw;
+  real_matrix quad_phiwT;
 
 public:
   // I know that friends are evil, but I decided to have them anyway
@@ -66,8 +89,8 @@ public:
 
   ~Function1D() {}
 
-  bool is_compressed() {return form == FunctionForm::COMPRESSED;}
-  bool is_reconstructed() {return form == FunctionForm::RECONSTRUCTED;}
+  bool is_compressed() const {return form == FunctionForm::COMPRESSED;}
+  bool is_reconstructed() const {return form == FunctionForm::RECONSTRUCTED;} 
 
   void init_twoscale(int k) {
     hg = TwoScaleCoeffs::instance()->hg(k); 
@@ -79,9 +102,10 @@ public:
     quad_w = gauss_legendre_w(order);
     quad_npts = quad_w.size();
 
-    quad_phi  = zeros<double>(quad_npts, k);
-    quad_phiT = zeros<double>(k, quad_npts);
-    quad_phiw = zeros<double>(quad_npts, k);
+    quad_phi   = zeros<double>(quad_npts, k);
+    quad_phiT  = zeros<double>(k, quad_npts);
+    quad_phiw  = zeros<double>(quad_npts, k);
+    quad_phiwT = zeros<double>(k, quad_npts);
     for (auto i = 0; i < quad_npts; i++) {
       auto p = ScalingFunction::instance()->phi(quad_x[i], k);
       for (auto m = 0; m < k; m++) {
@@ -90,6 +114,7 @@ public:
         quad_phiw(i,m) = quad_w[i]*p[m];
       }
     }
+    quad_phiwT = transpose(quad_phiw); 
   }
 
   Vector project_box(double (*f)(double), int n, int l) {
@@ -110,16 +135,13 @@ public:
     Vector s0 = project_box(f, n+1, 2*l);
     Vector s1 = project_box(f, n+1, 2*l+1);
     Vector s(2*k);
-    for (auto i = 0; i < k; i++) {
-      s[i] = s0[i];
-      s[i+k] = s1[i];
-    }
+    pack(k, s0, s1, s);
     Vector d = hg*s;
+    stree[Key(n,l)] = Vector();
     if (normf(Vector(d.slice(k,2*k-1))) < thresh || n >= maxlevel-1) {
       stree[Key(n+1,2*l)] = s0;
       stree[Key(n+1,2*l+1)] = s1;
     } else {
-      stree[Key(n,l)] = Vector();
       refine(f, n+1, 2*l);
       refine(f, n+1, 2*l+1);
     }
@@ -130,10 +152,7 @@ public:
     if (dp != dtree.end()) {
       Vector dd = dp->second;
       Vector d(2*k);
-      for (auto i = 0; i < k; i++) {
-        d[i]   = ss[i];
-        d[i+k] = dd[i];
-      }
+      pack(k, ss, dd, d);
       auto s = hgT*d;
       Vector s0(k);
       Vector s1(k);
@@ -165,10 +184,7 @@ public:
       s1 = compress_spawn(dtree_r, n+1, 2*l+1);
     }
     Vector s(2*k);
-    for (auto i = 0; i < k; i++) {
-      s[i]   = s0[i];
-      s[i+k] = s1[i];
-    }
+    pack(k, s0, s1, s);
     Vector d = hg*s;
     auto sr = d.slice(0,k-1); 
     auto dr = d.slice(k,2*k-1);
@@ -220,23 +236,70 @@ public:
     return r;
   }
 
-  // void mul_helper(const CoeffTree& f, const CoeffTree& g, const Vector& fs, const Vector& gs, int n, int l) {
-  //   auto fsin = fs;
-  //   if (fsin.size() == 0) {
-  //     const auto fp = f.find(Key(n,l));
-  //     
-  //   }
-  //   const auto gp = g.find(Key(n,l));
-  //    
-  // }
+  void mul_helper(CoeffTree& r, const CoeffTree& f, const CoeffTree& g, 
+                  const Vector& fsin, const Vector& gsin, int n, int l) {
+    auto mrefine = true;
+    auto fs = fsin;
+    if (fs.size() == 0) {
+      const auto fp = f.find(Key(n,l));
+      assert(fp != f.end());
+      fs = fp->second;
+    }
+    auto gs = gsin;
+    if (gs.size() == 0) {
+      const auto gp = g.find(Key(n,l));
+      assert(gp != g.end());
+      gs = gp->second;
+    }
+    if (fs.size() && gs.size()) {
+      if (mrefine) {
+        // refine to lower level for both f and g 
+        Vector fd(2*k);
+        Vector gd(2*k);
+        // pack the coeffs together so that we can do two scale
+        pack(k, fs, Vector(k, 0.0), fd);
+        pack(k, gs, Vector(k, 0.0), gd);
+        auto fss = hgT*fd; auto gss = hgT*gd; 
+        Vector fs0(k); Vector fs1(k);
+        Vector gs0(k); Vector gs1(k);
+        // unpack the coeffs on n+1 level
+        unpack(k, fss, fs0, fs1);
+        unpack(k, gss, gs0, gs1);
+        // convert to function values
+        auto scale = std::sqrt(std::pow(2.0, n+1));
+        auto fs0vals = quad_phi * fs0;
+        auto fs1vals = quad_phi * fs1;
+        auto gs0vals = quad_phi * gs0;
+        auto gs1vals = quad_phi * gs1;
+        auto rs0 = fs0vals * gs0vals;
+        auto rs1 = fs1vals * gs1vals;
+        rs0 = (quad_phiwT * rs0);
+        rs1 = (quad_phiwT * rs1);
+        rs0.scale(scale);
+        rs1.scale(scale);
+        r[Key(n,l)] = Vector();
+        r[Key(n+1,2*l)] = rs0;
+        r[Key(n+1,2*l+1)] = rs1;
+      } else {
+        // do multiply
+        auto rs = fs * gs;
+        r[Key(n,l)] = rs;
+      }
+    } else {
+      r[Key(n,l)] = Vector(); 
+      mul_helper(r, f, g, fs, gs, n+1, 2*l);
+      mul_helper(r, f, g, fs, gs, n+1, 2*l+1);
+    }
+  }
 
-  // Function1D operator*(const Function1D& f) const {
-  //   Function1D r(f.k, f.thresh, f.maxlevel, f.initiallevel);
-  //   r.form = Function1D::FunctionForm::RECONSTRUCTED;
-  //   assert(is_reconstructed());
-  //   assert(f.is_reconstructed());
-  //   r.mul_helper(stree, f.stree, Vector(), Vector(), 0, 0); 
-  // }
+  Function1D operator*(const Function1D& g) const {
+    Function1D r(g.k, g.thresh, g.maxlevel, g.initiallevel);
+    r.form = Function1D::FunctionForm::RECONSTRUCTED;
+    assert(is_reconstructed());
+    assert(g.is_reconstructed());
+    r.mul_helper(r.stree, stree, g.stree, Vector(), Vector(), 0, 0); 
+    return r;
+  }
 
   double eval(double x, int n, int l) {
     assert(n < maxlevel);
@@ -274,18 +337,28 @@ public:
     printf(")  %15.8e\n",normf(d));
   }
 
-  void print_tree() {
+  void print_tree(bool docoeffs = false) {
     printf("sum coeffs:\n");
     for (auto c : stree) {
       auto k = c.first;
-      auto s = c.second; 
-      printf("[%d  %d]     %15.8e\n", k.n, k.l, normf(s));
+      auto s = c.second;
+      if (docoeffs) {
+        printf("[%d  %d]     %15.8e\n", k.n, k.l, normf(s));
+        print(s);
+      } else {
+        printf("[%d  %d]     %15.8e\n", k.n, k.l, normf(s));
+      }
     }
     printf("diff coeffs:\n");
     for (auto c : dtree) {
       auto k = c.first;
       auto d = c.second; 
-      printf("[%d  %d]     %15.8e\n", k.n, k.l, normf(d));
+      if (docoeffs) {
+        printf("[%d  %d]     %15.8e\n", k.n, k.l, normf(d));
+        print(d);
+      } else {
+        printf("[%d  %d]     %15.8e\n", k.n, k.l, normf(d));
+      }
     }
   }
 };

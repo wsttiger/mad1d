@@ -3,7 +3,15 @@
 const double PI = 3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825;
 const int k = 4;
 const double thresh = 1e-8;
-const int initiallevel = 2;
+const int initiallevel = 1;
+
+double linear(double x) {
+  return x;
+}
+
+double quadratic(double x) {
+  return x*x;
+}
 
 double func1(double x) {
   auto c = 1.0;
@@ -19,6 +27,10 @@ double func2(double x) {
 
 double sum_f12(double x) {
   return func1(x) + func2(x);
+}
+
+double mul_f12(double x) {
+  return func1(x) * func2(x);
 }
 
 void test_function_point() {
@@ -56,8 +68,45 @@ void test_add() {
   f12c.print_tree();
 }
 
+void test_mul() {
+  auto fr = Function1D(func1, k, thresh, 30, initiallevel);
+  printf("\nfunction fr:\n");
+  fr.print_tree();
+  auto gr = Function1D(func2, k, thresh, 30, initiallevel);
+  printf("\nfunction gr:\n");
+  gr.print_tree();
+  auto fgr = fr * gr;
+  printf("\nfunction f+g(r):\n");
+  fgr.print_tree();
+  auto f12r = Function1D(mul_f12, k, thresh, 30, initiallevel+1);
+  printf("\nfunction f12r:\n");
+  f12r.print_tree();
+
+  auto x = 0.23111;
+  printf("x: %15.8e f: %15.8e func: %15.8e error: %15.8e\n", x, fgr(x), f12r(x), std::abs(fgr(x)-f12r(x)));
+}
+
+void test_simple_mul() {
+  auto fr = Function1D(linear, k, thresh, 30, 0);
+  printf("\nfunction fr:\n");
+  fr.print_tree(true);
+  auto gr = Function1D(linear, k, thresh, 30, 0);
+  printf("\nfunction gr:\n");
+  gr.print_tree(true);
+  auto fgr = fr * gr;
+  printf("\nfunction f+g(r):\n");
+  fgr.print_tree(true);
+  auto f12r = Function1D(quadratic, k, thresh, 30, 1);
+  printf("\nfunction f12r:\n");
+  f12r.print_tree(true);
+
+  auto x = 0.23111;
+  printf("x: %15.8e f: %15.8e func: %15.8e error: %15.8e\n", x, fgr(x), f12r(x), std::abs(fgr(x)-f12r(x)));
+}
+
 int main(int argc, char** argv) {
   //test_function_compress();
-  test_add();
+  //test_add();
+  test_mul();
   return 0;
 }

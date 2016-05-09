@@ -44,6 +44,7 @@ class VectorT {
   // is the matrix currently allocated?
   bool _allocated;
 
+  // this can serve as either a deep copy or as a zeros_like (in Numpy)
   friend VectorT copy(const VectorT& t, bool empty = false) {
     VectorT r;
     if (t._allocated) {
@@ -94,9 +95,9 @@ public:
     for (auto i = 0; i < v.size(); i++) _p[i] = v[i];
   }
 
-  VectorT(int k) {
+  VectorT(int k, T val = T(0)) {
     create(k);  
-    for (auto i = 0; i < k; i++) _p[i] = T(0);
+    for (auto i = 0; i < k; i++) _p[i] = val;
   }
 
   void create(int d0) {
@@ -176,6 +177,14 @@ public:
     return r;
   }
 
+  // point by point multiplication
+  VectorT operator*(const VectorT& t) const {
+    assert(_dim0 == t._dim0);
+    VectorT r = copy(t, true);
+    for (auto i = 0; i < size(); i++) r._p[i] = _p[i]*t._p[i];
+    return r;
+  }
+ 
   // addition
   VectorT operator+(const VectorT& t) const {
     return gaxpy_oop(1.0, t, 1.0);
@@ -525,14 +534,12 @@ public:
   // multiply with a VectorT
   VectorT<T> operator* (const VectorT<T>& v) const {
     int vsz = v.size();
-    // VectorT<T> r(vsz);
-    VectorT<T> r;
-    r.create(vsz);
+    VectorT<T> r(_dim0);
     assert(vsz == _dim1);
     for (int i = 0; i < _dim0; i++) {
       T s = T(0);
       for (int j = 0; j < _dim1; j++) {
-        s += _p[i*_dim0+j]*v[j];
+        s += _p[i*_dim1+j]*v[j];
       }
       r[i] = s;
     }
