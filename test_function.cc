@@ -1,8 +1,8 @@
 #include "function1d.h"
 
 const double PI = 3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825;
-const int k = 4;
-const double thresh = 1e-8;
+const int k = 8;
+const double thresh = 1e-4;
 const int initiallevel = 1;
 
 double linear(double x) {
@@ -17,6 +17,12 @@ double func1(double x) {
   auto c = 1.0;
   auto mu = 2.0;
   return c*sin(2*PI*x)*std::exp(-mu*x);
+}
+
+double dfunc1(double x) {
+  auto c = 1.0;
+  auto mu = 2.0;
+  return c*cos(2*PI*x)*std::exp(-mu*x)-mu*c*sin(2*PI*x)*std::exp(-mu*x);
 }
 
 double func2(double x) {
@@ -40,6 +46,14 @@ void test_function_point() {
    printf("x: %15.8e f: %15.8e func: %15.8e error: %15.8e\n", x, f(x), func1(x), std::abs(f(x)-func1(x)));
 }
 
+void test_diff_function_point() {
+   Function1D f(func1, k, thresh, 30, initiallevel);
+   f.print_tree();
+   Function1D df = f.diff();
+   df.print_tree();
+   auto x = 0.23111;
+   printf("x: %15.8e f: %15.8e func: %15.8e error: %15.8e\n", x, df(x), dfunc1(x), std::abs(df(x)-dfunc1(x)));
+}
 void test_function_compress() {
    Function1D f(func1, k, thresh, 30, initiallevel);
    printf("f : \n");
@@ -107,6 +121,7 @@ void test_simple_mul() {
 int main(int argc, char** argv) {
   //test_function_compress();
   //test_add();
-  test_mul();
+  //test_mul();
+  test_diff_function_point();
   return 0;
 }

@@ -5,6 +5,7 @@
 
 using Vector = real_vector;
 using CoeffTree = std::map<Key,Vector>;
+using CoeffResultPair = std::pair<bool,Vector>;
 
 double normf(Vector v) {
   auto s = 0.0;
@@ -56,6 +57,9 @@ private:
   real_matrix quad_phiT;
   real_matrix quad_phiw;
   real_matrix quad_phiwT;
+  real_matrix r0;
+  real_matrix rp;
+  real_matrix rm;
 
 public:
   // I know that friends are evil, but I decided to have them anyway
@@ -70,6 +74,7 @@ public:
     form = FunctionForm::UNDEFINED;
     init_twoscale(k);
     init_quadrature(k);
+    make_dc_periodic(k);
   }
 
   Function1D(double (*f) (double), int k, double thresh, int maxlevel = 30, int initiallevel = 4) 
@@ -77,6 +82,7 @@ public:
     form = FunctionForm::RECONSTRUCTED;
     init_twoscale(k);
     init_quadrature(k);
+    make_dc_periodic(k);
     int ntrans = std::pow(2, initiallevel);
     for (auto l = 0; l < ntrans; l++) refine(f, initiallevel, l);
     for (auto n = 0; n <= initiallevel; n++) {
@@ -294,10 +300,10 @@ public:
 
   Function1D operator*(const Function1D& g) const {
     Function1D r(g.k, g.thresh, g.maxlevel, g.initiallevel);
-    r.form = Function1D::FunctionForm::RECONSTRUCTED;
     assert(is_reconstructed());
     assert(g.is_reconstructed());
     r.mul_helper(r.stree, stree, g.stree, Vector(), Vector(), 0, 0); 
+    r.form = Function1D::FunctionForm::RECONSTRUCTED;
     return r;
   }
 
@@ -319,6 +325,81 @@ public:
       return eval(x2, n2, l2);
     } 
   }
+
+  void make_dc_periodic(int k) {
+    r0 = zeros<double>(k,k);
+    rp = zeros<double>(k,k);
+    rm = zeros<double>(k,k);
+
+    auto iphase = 1.0;
+    for (auto i = 0; i < k; i++) {
+      auto jphase = 1.0;
+      for (auto j = 0; j < k; j++) {
+        auto gammaij = std::sqrt((2*i+1)*(2*j+1)); 
+        auto Kij = ((i-j) > 0 && (i-j) % 2== 1) ? 2.0 : 0.0;
+        r0(i,j) = 0.5*(1.0 - iphase*jphase - 2.0*Kij)*gammaij;
+        rm(i,j) = 0.5*jphase*gammaij;
+        rp(i,j) =-0.5*iphase*gammaij;
+        jphase = -jphase;
+      }
+      iphase = -iphase;    
+    }
+  }
+
+  void recur_down(int n, int l, const Vector& s) {
+  }
+
+  CoeffResultPair get_coeffs(int n, int l) {
+    if ((l < 0) || l >= (1 << n)) return CoeffResultPair(true, Vector(k, 0.0));
+    auto sp = stree.find(Key(n,l));
+    if (sp != stree.end()) return CoeffResultPair(true,sp->second);
+
+    Vector s(k);
+    if (n > 0) {
+      auto srpair = get_coeffs(n-1,l/2);
+      if (!srpair.first) return CoeffResultPair(false, Vector(k));
+      s = srpair.second;
+    } else {
+      return CoeffResultPair(false, Vector(k));
+    }
+    recur_down(n-1,l/2,s);
+  } 
+ 
+  void diff_spawn(CoeffTree& result, int n, int l) {
+    auto sp = stree.find(Key(n,l));
+    assert(sp != stree.end()); 
+    auto s = sp->second;
+    if (s.size() == 0.0) {
+      diff_spawn(result, n+1, 2*l);
+      diff_spawn(result, n+1, 2*l+1);
+    } else {
+      auto sm_pair = get_coeffs(n,l-1);
+      auto sp_pair = get_coeffs(n,l+1);
+      auto s0_pair = stree.find(Key(n,l));
+
+      if (sm_pair.first && sp_pair.first &&
+          (s0_pair != stree.end())) {
+        auto sm = sm_pair.second;
+        auto sp = sp_pair.second;
+        auto s0 = s0_pair->second;
+        auto r = rp*sm + r0*s0 + rm*sp;
+        r.scale(std::pow(2.0,n));
+        result[Key(n,l)] = r;
+      } else {
+        diff_spawn(result, n+1, 2*l);
+        diff_spawn(result, n+1, 2*l+1);
+      }
+    }
+  }
+
+  Function1D diff() const {
+    Function1D r(k, thresh, maxlevel, initiallevel);
+    Function1D f(*this);
+    f.diff_spawn(r.stree, 0, 0);
+    r.form = Function1D::FunctionForm::RECONSTRUCTED;
+    return r;
+  }
+
 
   void print_coeffs(int n, int l) {
     printf("sum coeffs:\n");
